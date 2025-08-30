@@ -45,7 +45,7 @@ class SystemPerformanceMonitor(tk.Frame):
         title_frame.pack(side=tk.TOP, fill=tk.X)
         title_label = tk.Label(
             title_frame,
-            text="System Performance Monitor",
+            text="SysPulse",
             font=Font(family="Roboto", size=18, weight="bold"),
             bg=accent_color,
             fg=fg_color,
