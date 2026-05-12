@@ -1,47 +1,71 @@
-# SysPulse: Your Cross-Platform System Vitals Dashboard! 🚀
+# SysPulse v2.0
 
-Keep a close eye on your system's performance with SysPulse, a sleek and insightful monitoring tool designed to track CPU, RAM, and hardware temperatures. Initially focused on Linux support, SysPulse provides a real-time view of your system's health, helping you optimize performance and identify potential bottlenecks.
+Professional cross-platform system performance monitor built with Python and Tkinter. Real-time dashboards, process management, and hardware monitoring in a sleek dark-themed interface.
 
-## Features at a Glance ✨
+## Features
 
-•   **CPU Load Monitoring:** Track your processor's activity.
-•   **RAM Usage Visualization:** Get a clear picture of your memory consumption.
-•   **Hardware Temperature Readings (Linux):** Stay informed about your system's temperature to prevent overheating and ensure hardware longevity.
+- **Real-Time Dashboard** - Live CPU, memory, disk, and network metrics with animated charts
+- **Process Manager** - Sortable process table with search, filtering, and kill functionality
+- **System Information** - Detailed OS, CPU, memory, and network interface details
+- **Configurable Settings** - Toggle metrics visibility, adjust refresh intervals, temperature units
+- **Modern Dark UI** - Professional dark theme with accent colors and smooth visualizations
+- **Cross-Platform** - Works on Linux, Windows, and macOS
 
-## Getting Started 🛠️
-
-Ready to dive in? Follow these simple steps to get SysPulse up and running:
-
-1.  **Clone the Repository:**
-
-```
-git clone https://github.com/d0x0day/SysPulse.git
-```
-
-2.  Install Dependencies:
+## Architecture
 
 ```
+syspulse/
+|-- __init__.py              # Package marker
+|-- __main__.py              # Module entry point: python -m syspulse
+|-- main.py                  # Application entry point
+|-- requirements.txt         # Dependencies
+|
+|-- core/                    # Core business logic
+|   |-- __init__.py
+|   |-- config.py            # Constants, colors, paths
+|   |-- logger.py            # Centralized logging setup
+|   |-- settings_manager.py  # JSON-based user preferences
+|
+|-- services/                # Data layer
+|   |-- __init__.py
+|   |-- system_collector.py  # Background thread: CPU, memory, disk, network, temps, processes
+|
+|-- gui/                     # Presentation layer
+|   |-- __init__.py
+|   |-- app.py               # Main window, navigation, update loop
+|   |-- dashboard_view.py    # Metrics cards, charts, disk table, temperatures
+|   |-- processes_view.py    # Process table with sort, search, kill
+|   |-- settings_view.py     # Toggle switches, interval selector, reset
+|   |-- system_info_view.py  # Static system details + dynamic uptime
+|   |-- widgets.py           # Reusable: MetricCard, ProgressBar, ToggleSwitch, ScrollableFrame
+```
+
+## Quick Start
+
+```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Run application
+python main.py
+
+# Or as a module
+python -m syspulse
 ```
 
-3.  Launch SysPulse:
+## Requirements
 
-    Linux:
-    
-```
-python3 src/main.py
-```
-Windows: (Future implementation) - Stay tuned!
+- Python 3.8+
+- psutil >= 7.0.0
+- matplotlib >= 3.7.0
 
-▌Compatibility ⚙️
+## Settings
 
-•   Linux: Fully supported, leveraging the sensors utility for accurate temperature readings.
-•   Windows: (Under Development)
+User preferences are stored in `settings.json` and include:
 
-▌Contributing 🤝
-
-I welcome contributions from the community! If you have ideas, suggestions, or bug reports, please don't hesitate to submit them. Let's make SysPulse even better together!
-
-▌Connect with the Developer 💬
-
-Have questions or feedback? Reach out on Telegram: d0x0day
+- Visibility toggles for each metric section
+- Refresh interval (0.5s / 1s / 2s)
+- Chart display options
+- Temperature unit (Celsius / Fahrenheit)
+- Process kill confirmation
+- Sort preferences for process table
