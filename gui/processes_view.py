@@ -99,8 +99,12 @@ class ProcessesView(tk.Frame):
         self.count_label.pack(side=tk.RIGHT, padx=(0, 15))
 
         # Treeview (process table)
-        tree_frame = tk.Frame(self, bg=COLORS["bg_primary"], padx=20, pady=(0, 20))
+        tree_frame = tk.Frame(self, bg=COLORS["bg_primary"])
         tree_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Inner padding frame (padx/pady as tuples work in pack/grid, not in widget creation)
+        inner_frame = tk.Frame(tree_frame, bg=COLORS["bg_primary"])
+        inner_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
         # Style configuration for treeview
         style = ttk.Style()
@@ -132,7 +136,7 @@ class ProcessesView(tk.Frame):
 
         columns = ("pid", "name", "user", "status", "cpu", "memory", "threads")
         self.tree = ttk.Treeview(
-            tree_frame, columns=columns, show="headings",
+            inner_frame, columns=columns, show="headings",
             style="Custom.Treeview", selectmode="browse"
         )
 
@@ -152,16 +156,16 @@ class ProcessesView(tk.Frame):
             self.tree.column(col, width=width, anchor="w" if col in ("name", "user") else "center")
 
         # Scrollbars
-        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
+        vsb = ttk.Scrollbar(inner_frame, orient="vertical", command=self.tree.yview)
+        hsb = ttk.Scrollbar(inner_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
 
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
+        inner_frame.grid_rowconfigure(0, weight=1)
+        inner_frame.grid_columnconfigure(0, weight=1)
 
         # Bind selection event
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
