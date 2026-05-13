@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 
 from core.config import COLORS
 from core.settings_manager import SettingsManager
-from gui.widgets import MetricCard, ProgressBar, SectionHeader
+from gui.widgets import MetricCard, ProgressBar, SectionHeader, ScrollableFrame
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,14 @@ class DashboardView(tk.Frame):
     def _build_layout(self) -> None:
         """Construct the dashboard UI components."""
         # Main scrollable container
-        container = tk.Frame(self, bg=COLORS["bg_primary"])
-        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        scroll_container = ScrollableFrame(self)
+        scroll_container.pack(fill=tk.BOTH, expand=True)
+        container = scroll_container.scrollable_frame
+
+        # Add padding inside scrollable frame
+        inner_pad = tk.Frame(container, bg=COLORS["bg_primary"])
+        inner_pad.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        container = inner_pad
 
         # Header
         header = tk.Label(
@@ -235,18 +241,34 @@ class DashboardView(tk.Frame):
 
     def _update_disk_table(self, partitions: list) -> None:
         """Refresh the disk partitions table."""
-        # Clear existing rows
-        for widget in self.disk_rows_frame.winfo_children():
-            widget.destroy()
+        # Check if we need to rebuild or just update
+        existing_rows = len(self.disk_rows_frame.winfo_children())
+        has_data = bool(partitions)
+        
+        # If data availability changed, clear and rebuild structure
+        if has_data != (existing_rows > 0 and not isinstance(self.disk_rows_frame.winfo_children()[0], tk.Label)):
+            for widget in self.disk_rows_frame.winfo_children():
+                widget.destroy()
+            existing_rows = 0
 
         if not partitions:
-            tk.Label(
-                self.disk_rows_frame, text="No disk information available",
-                font=("Inter", 9), bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
-            ).pack(anchor="w", pady=5)
+            if existing_rows == 0:
+                tk.Label(
+                    self.disk_rows_frame, text="No disk information available",
+                    font=("Inter", 9), bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
+                ).pack(anchor="w", pady=5)
             return
 
+        # Clear placeholder if it exists
+        if existing_rows == 1 and isinstance(self.disk_rows_frame.winfo_children()[0], tk.Label):
+            if self.disk_rows_frame.winfo_children()[0].cget("text") == "No disk information available":
+                for widget in self.disk_rows_frame.winfo_children():
+                    widget.destroy()
+                existing_rows = 0
+
         widths = [15, 15, 8, 10, 10, 10, 20]
+        num_cols = len(widths)
+
         for row_idx, part in enumerate(partitions):
             values = [
                 part.get("device", ""),
@@ -257,59 +279,134 @@ class DashboardView(tk.Frame):
                 f"{part.get('free_gb', 0):.1f} GB",
                 f"{part.get('percent', 0)}%",
             ]
-            for col_idx, (value, width) in enumerate(zip(values, widths)):
-                tk.Label(
-                    self.disk_rows_frame, text=value, font=("Inter", 9),
-                    bg=COLORS["bg_primary"], fg=COLORS["text_primary"],
-                    width=width, anchor="w"
-                ).grid(row=row_idx, column=col_idx, padx=(0, 5), pady=2)
 
-            # Usage bar
-            bar_width = 100
-            bar = tk.Canvas(
-                self.disk_rows_frame, width=bar_width, height=6,
-                bg=COLORS["border"], highlightthickness=0
-            )
-            bar.grid(row=row_idx, column=len(widths) - 1, padx=(0, 5), pady=2)
+            # Reuse existing row widgets if available
+            row_widgets = []
+            if row_idx < existing_rows:
+                # Get all widgets in this row (they were packed in grid)
+                # We need to find widgets by grid position
+                for widget in self.disk_rows_frame.winfo_children():
+                    if int(widget.grid_info().get("row", -1)) == row_idx:
+                        row_widgets.append(widget)
+                row_widgets.sort(key=lambda w: int(w.grid_info().get("column", 0)))
+            else:
+                # Create new labels for this row
+                for col_idx in range(num_cols):
+                    lbl = tk.Label(
+                        self.disk_rows_frame, text="", font=("Inter", 9),
+                        bg=COLORS["bg_primary"], fg=COLORS["text_primary"],
+                        width=widths[col_idx], anchor="w"
+                    )
+                    lbl.grid(row=row_idx, column=col_idx, padx=(0, 5), pady=2)
+                    row_widgets.append(lbl)
 
-            pct = part.get("percent", 0)
-            fill_w = (pct / 100) * bar_width
-            color = COLORS["success"] if pct < 70 else COLORS["warning"] if pct < 90 else COLORS["danger"]
-            if fill_w > 0:
-                bar.create_rectangle(0, 0, fill_w, 6, fill=color, outline="")
+                # Usage bar (canvas)
+                bar_width = 100
+                bar = tk.Canvas(
+                    self.disk_rows_frame, width=bar_width, height=6,
+                    bg=COLORS["border"], highlightthickness=0
+                )
+                bar.grid(row=row_idx, column=num_cols - 1, padx=(0, 5), pady=2)
+                row_widgets.append(bar)
+
+            # Update values
+            for col_idx, value in enumerate(values):
+                if col_idx < len(row_widgets):
+                    row_widgets[col_idx].config(text=value)
+
+            # Update progress bar
+            bar = row_widgets[-1] if row_widgets else None
+            if isinstance(bar, tk.Canvas):
+                bar.delete("all")
+                pct = part.get("percent", 0)
+                fill_w = (pct / 100) * 100
+                color = COLORS["success"] if pct < 70 else COLORS["warning"] if pct < 90 else COLORS["danger"]
+                if fill_w > 0:
+                    bar.create_rectangle(0, 0, fill_w, 6, fill=color, outline="")
+
+        # Remove excess rows
+        for widget in self.disk_rows_frame.winfo_children():
+            row = int(widget.grid_info().get("row", -1))
+            if row >= len(partitions):
+                widget.destroy()
 
     def _update_temperatures(self, temperatures: dict) -> None:
         """Refresh temperature display."""
-        # Clear existing
-        for widget in self.temp_labels_frame.winfo_children():
-            widget.destroy()
+        existing_frames = [w for w in self.temp_labels_frame.winfo_children() if isinstance(w, tk.Frame)]
+        has_data = bool(temperatures)
 
+        # Show placeholder if no data
         if not temperatures:
-            tk.Label(
-                self.temp_labels_frame,
-                text="No temperature sensors detected",
-                font=("Inter", 9), bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
-            ).pack(anchor="w", pady=5)
+            if not existing_frames:
+                # Check if placeholder already exists
+                has_placeholder = False
+                for w in self.temp_labels_frame.winfo_children():
+                    if isinstance(w, tk.Label) and w.cget("text") == "No temperature sensors detected":
+                        has_placeholder = True
+                        break
+                if not has_placeholder:
+                    for w in self.temp_labels_frame.winfo_children():
+                        w.destroy()
+                    tk.Label(
+                        self.temp_labels_frame,
+                        text="No temperature sensors detected",
+                        font=("Inter", 9), bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
+                    ).pack(anchor="w", pady=5)
+            else:
+                for w in self.temp_labels_frame.winfo_children():
+                    w.destroy()
+                tk.Label(
+                    self.temp_labels_frame,
+                    text="No temperature sensors detected",
+                    font=("Inter", 9), bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
+                ).pack(anchor="w", pady=5)
             return
 
-        for name, temp in temperatures.items():
-            frame = tk.Frame(self.temp_labels_frame, bg=COLORS["bg_primary"])
-            frame.pack(side=tk.LEFT, padx=(0, 20), pady=5)
+        # Remove placeholder if exists
+        for w in list(self.temp_labels_frame.winfo_children()):
+            if isinstance(w, tk.Label):
+                w.destroy()
 
-            # Color based on temperature
-            if temp >= 80:
-                color = COLORS["danger"]
-            elif temp >= 60:
-                color = COLORS["warning"]
+        temp_items = list(temperatures.items())
+
+        for idx, (name, temp) in enumerate(temp_items):
+            if idx < len(existing_frames):
+                frame = existing_frames[idx]
+                # Update existing frame
+                labels = [w for w in frame.winfo_children() if isinstance(w, tk.Label)]
+                if len(labels) >= 2:
+                    labels[0].config(text=name)
+                    
+                    if temp >= 80:
+                        color = COLORS["danger"]
+                    elif temp >= 60:
+                        color = COLORS["warning"]
+                    else:
+                        color = COLORS["success"]
+                    
+                    labels[1].config(text=f"{temp}°C", fg=color)
             else:
-                color = COLORS["success"]
+                frame = tk.Frame(self.temp_labels_frame, bg=COLORS["bg_primary"])
+                frame.pack(side=tk.LEFT, padx=(0, 20), pady=5)
 
-            tk.Label(
-                frame, text=name, font=("Inter", 8),
-                bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
-            ).pack(anchor="w")
+                if temp >= 80:
+                    color = COLORS["danger"]
+                elif temp >= 60:
+                    color = COLORS["warning"]
+                else:
+                    color = COLORS["success"]
 
-            tk.Label(
-                frame, text=f"{temp}C", font=("Inter", 12, "bold"),
-                bg=COLORS["bg_primary"], fg=color
-            ).pack(anchor="w")
+                tk.Label(
+                    frame, text=name, font=("Inter", 8),
+                    bg=COLORS["bg_primary"], fg=COLORS["text_secondary"]
+                ).pack(anchor="w")
+
+                tk.Label(
+                    frame, text=f"{temp}°C", font=("Inter", 12, "bold"),
+                    bg=COLORS["bg_primary"], fg=color
+                ).pack(anchor="w")
+
+        # Remove excess frames
+        for idx, frame in enumerate(existing_frames):
+            if idx >= len(temp_items):
+                frame.destroy()

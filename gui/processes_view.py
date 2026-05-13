@@ -51,7 +51,6 @@ class ProcessesView(tk.Frame):
         search_frame.pack(side=tk.RIGHT)
 
         self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", self._on_search)
 
         search_entry = tk.Entry(
             search_frame, textvariable=self.search_var,
@@ -72,6 +71,9 @@ class ProcessesView(tk.Frame):
             search_entry.insert(0, "Search..."),
             search_entry.config(fg=COLORS["text_secondary"])
         ) if not search_entry.get() else None)
+
+        # Bind trace AFTER tree is created to avoid AttributeError during init
+        self.search_var.trace_add("write", self._on_search)
 
         # Kill button
         self.kill_btn = tk.Button(

@@ -168,24 +168,29 @@ class ScrollableFrame(tk.Frame):
         )
 
         self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self._on_scroll)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bind mouse wheel
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.bind("<Destroy>", self._on_destroy)
+        # Bind mouse wheel only to this widget and its children
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+        self.scrollable_frame.bind("<Enter>", self._bind_mousewheel)
+        self.scrollable_frame.bind("<Leave>", self._unbind_mousewheel)
+        self.scrollbar.bind("<Enter>", self._bind_mousewheel)
+        self.scrollbar.bind("<Leave>", self._unbind_mousewheel)
 
         # Track canvas resize
         self.canvas.bind("<Configure>", self._on_canvas_configure)
 
-    def _on_scroll(self, *args):
-        """Show scrollbar only when needed."""
-        self.scrollbar.set(*args)
-        if float(args[0]) > 0 or float(args[1]) < 1:
-            self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        else:
-            self.scrollbar.pack_forget()
+    def _bind_mousewheel(self, event=None):
+        """Bind mouse wheel when cursor enters the scrollable area."""
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, event=None):
+        """Unbind mouse wheel when cursor leaves the scrollable area."""
+        self.canvas.unbind_all("<MouseWheel>")
 
     def _on_mousewheel(self, event):
         """Handle mouse wheel scrolling."""
@@ -194,7 +199,3 @@ class ScrollableFrame(tk.Frame):
     def _on_canvas_configure(self, event):
         """Ensure inner frame matches canvas width."""
         self.canvas.itemconfig(self.canvas_window, width=event.width)
-
-    def _on_destroy(self, _event):
-        """Clean up bindings when widget is destroyed."""
-        self.canvas.unbind_all("<MouseWheel>")
